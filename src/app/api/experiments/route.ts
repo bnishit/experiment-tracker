@@ -1,9 +1,18 @@
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
-import { Prisma } from "@/generated/prisma";
+import { Prisma } from "@prisma/client";
 
 export async function GET(request: NextRequest) {
   try {
+    // Verify database connection first
+    if (!process.env.DATABASE_URL) {
+      console.error("DATABASE_URL is not set!");
+      return NextResponse.json(
+        { error: "Database configuration error", details: "DATABASE_URL not set" },
+        { status: 500 }
+      );
+    }
+
     const searchParams = request.nextUrl.searchParams;
     const platform = searchParams.get("platform");
     const userGroup = searchParams.get("userGroup");
