@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma";
 
 export async function GET(
   request: NextRequest,
@@ -51,7 +52,7 @@ export async function PATCH(
       isActive,
     } = body;
 
-    const updateData: any = {};
+    const updateData: Prisma.ExperimentUpdateInput = {};
 
     if (name !== undefined) updateData.name = name;
     if (expParameter !== undefined) updateData.expParameter = expParameter;

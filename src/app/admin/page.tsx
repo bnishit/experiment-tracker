@@ -40,11 +40,12 @@ export default function AdminPage() {
   const [showExperimentForm, setShowExperimentForm] = useState(false);
   const [editingExperiment, setEditingExperiment] =
     useState<Experiment | null>(null);
-  const [user, setUser] = useState<any>(null);
+  const [user, setUser] = useState<{ email?: string } | null>(null);
 
   useEffect(() => {
     fetchExperiments();
     checkUser();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const checkUser = async () => {

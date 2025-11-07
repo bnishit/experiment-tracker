@@ -18,7 +18,11 @@ interface Experiment {
   platforms: string[];
   context: string | null;
   isActive: boolean;
-  versions: any[];
+  versions: Array<{
+    id: string;
+    changeDate: string;
+    changes: string;
+  }>;
 }
 
 export default function Home() {
@@ -31,6 +35,7 @@ export default function Home() {
 
   useEffect(() => {
     fetchExperiments();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [search, platformFilter, userGroupFilter, activeFilter]);
 
   const fetchExperiments = async () => {

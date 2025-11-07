@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
+import { Prisma } from "@/generated/prisma";
 
 export async function GET(request: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(request: NextRequest) {
     const isActive = searchParams.get("isActive");
     const search = searchParams.get("search");
 
-    const where: any = {};
+    const where: Prisma.ExperimentWhereInput = {};
 
     if (platform) {
       where.platforms = { has: platform };
