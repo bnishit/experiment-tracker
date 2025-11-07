@@ -229,3 +229,42 @@ npm run prisma:studio
 - Make sure all environment variables are set in Vercel
 - Check that Prisma Client is generated (`npm run prisma:generate`)
 
+## Admin Authentication Setup (Supabase)
+
+1. In Supabase, go to **Project Settings → API** and copy the **Project URL** and **anon/public** key into `.env` as `NEXT_PUBLIC_SUPABASE_URL` and `NEXT_PUBLIC_SUPABASE_ANON_KEY`.
+2. Visit **Authentication → Settings** and turn off **Enable email signup** so only invited users can log in.
+3. Create admin accounts via **Authentication → Users → Add user**, set a secure password, and auto-confirm them so they can sign in immediately.
+4. Share only the login URL (e.g., `/login`) plus the user-specific credentials—avoid storing real keys in docs.
+
+## Checking Database Health
+
+- **Supabase Table Editor**: Navigate to your project dashboard → **Table Editor** to confirm `Experiment` and `Version` tables exist and contain data.
+- **Prisma Studio (local)**: Run `npx prisma studio` to inspect and edit rows at `http://localhost:5555`.
+- **API smoke test**: Hit `/api/experiments` on the deployed site; an empty array means the schema exists but may lack data.
+- If production data is missing, double-check the `DATABASE_URL` configured for each Vercel environment and run `npm run seed` or manual inserts as needed.
+
+## Fixing Supabase Connections on Vercel
+
+Vercel serverless functions work best with Supabase's **connection pooler** on port **6543**.
+
+1. In Supabase, open **Project Settings → Database → Connection string** and choose **Connection pooling → URI**.
+2. Copy the pooler URL (it ends with `:6543/...`). Never paste the password back into docs—keep it in `.env` or Vercel only.
+3. Update the `DATABASE_URL` environment variable in Vercel for Production/Preview/Development and redeploy.
+4. If needed, try the Transaction mode pooler instead of Session mode.
+
+## Deployment Checklist (Safe Values Only)
+
+1. **Repository**: Commit your changes and push to GitHub.
+2. **Vercel project**: Import the repo; Next.js defaults are detected automatically.
+3. **Environment variables**: Set `DATABASE_URL`, `NEXT_PUBLIC_SUPABASE_URL`, and `NEXT_PUBLIC_SUPABASE_ANON_KEY` for every environment **without** embedding live credentials in documentation.
+4. **First deploy**: Trigger a deploy and wait for completion.
+5. **Migrations**: Run `npx prisma db push` against the production database (via Vercel CLI `vercel env pull .env.local` if needed).
+6. **Redirects for Auth**: In Supabase, add your production domain (e.g., `https://your-app.vercel.app/login`) to the list of allowed redirect URLs.
+
+## Handling `DATABASE_URL` Passwords
+
+Supabase can generate a fully encoded connection string for you:
+
+1. Visit **Project Settings → Database** and copy the `URI` connection string (pooler or direct).
+2. The string already encodes special characters in the password—drop it straight into `.env` or the Vercel dashboard.
+3. If you hand-edit the string, URL-encode characters like `@`, `:`, or `/` so the driver parses the credentials correctly.
