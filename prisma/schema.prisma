@@ -22,16 +22,26 @@ model Experiment {
   isActive      Boolean   @default(true)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
-  
+
+  // GrowthBook Integration
+  growthbookFeatureId   String?   @unique
+  growthbookProjectId   String?
+  lastSyncedAt          DateTime?
+
+  // Optional metadata
+  owner         String?
+  tags          String[]  @default([])
+
   // Relationships
   versions      Version[]
-  
+
   @@index([name])
   @@index([expParameter])
   @@index([userGroup])
   @@index([isActive])
   @@index([liveDate])
   @@index([isActive, liveDate])
+  @@index([growthbookFeatureId])
 }
 
 model Version {

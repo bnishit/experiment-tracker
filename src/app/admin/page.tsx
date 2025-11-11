@@ -3,10 +3,11 @@
 import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, Plus, LogOut, User, Filter } from "lucide-react";
+import { ArrowLeft, Plus, LogOut, User, Filter, Link2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { ExperimentForm } from "@/components/experiment-form";
 import { VersionForm } from "@/components/version-form";
+import { GrowthBookLinkDialog } from "@/components/growthbook-link-dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Dialog,
@@ -27,6 +28,7 @@ interface Experiment {
   platforms: string[];
   context: string | null;
   isActive: boolean;
+  growthbookFeatureId?: string | null;
 }
 
 export default function AdminPage() {
@@ -41,6 +43,9 @@ export default function AdminPage() {
   const [editingExperiment, setEditingExperiment] =
     useState<Experiment | null>(null);
   const [user, setUser] = useState<{ email?: string } | null>(null);
+  const [showGrowthBookLink, setShowGrowthBookLink] = useState(false);
+  const [linkingExperiment, setLinkingExperiment] =
+    useState<Experiment | null>(null);
 
   useEffect(() => {
     fetchExperiments();
@@ -109,6 +114,48 @@ export default function AdminPage() {
       console.error("Error deleting experiment:", error);
       alert("Failed to delete experiment");
     }
+  };
+
+  const handleLinkToGrowthBook = (experiment: Experiment) => {
+    setLinkingExperiment(experiment);
+    setShowGrowthBookLink(true);
+  };
+
+  const handleLink = async (featureId: string) => {
+    if (!linkingExperiment) return;
+
+    const response = await fetch(
+      `/api/experiments/${linkingExperiment.id}/link`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ growthbookFeatureId: featureId }),
+      }
+    );
+
+    if (!response.ok) {
+      const error = await response.json();
+      throw new Error(error.message || "Failed to link to GrowthBook");
+    }
+
+    fetchExperiments();
+  };
+
+  const handleUnlink = async () => {
+    if (!linkingExperiment) return;
+
+    const response = await fetch(
+      `/api/experiments/${linkingExperiment.id}/link`,
+      {
+        method: "DELETE",
+      }
+    );
+
+    if (!response.ok) {
+      throw new Error("Failed to unlink from GrowthBook");
+    }
+
+    fetchExperiments();
   };
 
   return (
@@ -215,7 +262,7 @@ export default function AdminPage() {
                     style={{ animationDelay: `${index * 50}ms` }}
                   >
                     <div className="flex-1 min-w-0 pr-4">
-                      <div className="flex items-center gap-3 mb-2">
+                      <div className="flex items-center gap-3 mb-2 flex-wrap">
                         <h3 className="font-bold text-lg text-foreground">{experiment.name}</h3>
                         {experiment.isActive ? (
                           <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-green-500/10 text-green-700 border border-green-500/20">
@@ -227,6 +274,11 @@ export default function AdminPage() {
                             Inactive
                           </span>
                         )}
+                        {experiment.growthbookFeatureId && (
+                          <span className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-blue-500/10 text-blue-700 border border-blue-500/20">
+                            🚩 GrowthBook
+                          </span>
+                        )}
                       </div>
                       <p className="text-sm text-muted-foreground">
                         <span className="font-semibold text-foreground">{experiment.expParameter}</span>
@@ -234,7 +286,20 @@ export default function AdminPage() {
                         <span>{experiment.userGroup}</span>
                       </p>
                     </div>
-                    <div className="flex gap-2 flex-shrink-0">
+                    <div className="flex gap-2 flex-shrink-0 flex-wrap">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => handleLinkToGrowthBook(experiment)}
+                        className={
+                          experiment.growthbookFeatureId
+                            ? "hover:bg-blue-500/10 hover:border-blue-500/30 transition-all duration-300 border-2 border-blue-500/20"
+                            : "hover:bg-primary/10 hover:border-primary/30 transition-all duration-300 border-2"
+                        }
+                      >
+                        <Link2 className="h-3.5 w-3.5 mr-1" />
+                        {experiment.growthbookFeatureId ? "Relink" : "Link GB"}
+                      </Button>
                       <Button
                         variant="outline"
                         size="sm"
@@ -290,6 +355,18 @@ export default function AdminPage() {
             )}
           </DialogContent>
         </Dialog>
+
+        {linkingExperiment && (
+          <GrowthBookLinkDialog
+            open={showGrowthBookLink}
+            onOpenChange={setShowGrowthBookLink}
+            experimentId={linkingExperiment.id}
+            experimentName={linkingExperiment.name}
+            currentFeatureId={linkingExperiment.growthbookFeatureId}
+            onLink={handleLink}
+            onUnlink={handleUnlink}
+          />
+        )}
       </div>
     </div>
   );

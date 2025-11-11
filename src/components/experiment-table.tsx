@@ -21,6 +21,30 @@ interface Version {
   changes: string;
 }
 
+interface GrowthBookData {
+  featureId: string;
+  key: string;
+  valueType: string;
+  defaultValue: any;
+  description?: string;
+  enabled: boolean;
+  tags: string[];
+  rules: any[];
+  experiments: any[];
+  targetingSummary: string[];
+  hasExperiments: boolean;
+  hasRollouts: boolean;
+  hasOverrides: boolean;
+  ruleCount: number;
+  revision?: {
+    version: number;
+    comment: string;
+    publishedAt: string;
+  };
+  error?: string;
+  message?: string;
+}
+
 interface Experiment {
   id: string;
   name: string;
@@ -32,6 +56,8 @@ interface Experiment {
   context: string | null;
   isActive: boolean;
   versions: Version[];
+  growthbookFeatureId?: string | null;
+  growthbook?: GrowthBookData | null;
 }
 
 interface ExperimentTableProps {
@@ -93,7 +119,7 @@ export function ExperimentTable({ experiments }: ExperimentTableProps) {
             >
               <div className="flex items-start justify-between gap-4">
                 <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-3 mb-3 flex-wrap">
                     <CardTitle className="text-2xl font-bold text-foreground group-hover:text-primary transition-colors">
                       {experiment.name}
                     </CardTitle>
@@ -105,6 +131,11 @@ export function ExperimentTable({ experiments }: ExperimentTableProps) {
                     ) : (
                       <Badge variant="secondary" className="border-2 px-3 py-1">
                         Inactive
+                      </Badge>
+                    )}
+                    {experiment.growthbookFeatureId && (
+                      <Badge className="bg-blue-500/15 text-blue-700 border-blue-500/30 border-2 px-3 py-1 hover:bg-blue-500/20 transition-colors">
+                        🚩 GrowthBook
                       </Badge>
                     )}
                   </div>
@@ -203,6 +234,77 @@ export function ExperimentTable({ experiments }: ExperimentTableProps) {
                     </strong>
                     <div className="prose prose-sm max-w-none bg-gradient-to-br from-muted to-muted/50 p-4 rounded-lg border-2 border-border">
                       <ReactMarkdown>{experiment.context}</ReactMarkdown>
+                    </div>
+                  </div>
+                )}
+
+                {experiment.growthbook && !experiment.growthbook.error && (
+                  <div className="bg-blue-50 dark:bg-blue-950/30 rounded-xl p-4 border-2 border-blue-500/20">
+                    <strong className="text-sm font-semibold text-foreground flex items-center gap-2 mb-3">
+                      <div className="h-6 w-6 rounded-md bg-blue-500/20 flex items-center justify-center">
+                        <span className="text-xs">🚩</span>
+                      </div>
+                      GrowthBook Feature Flag
+                    </strong>
+                    <div className="space-y-3">
+                      <div className="bg-white dark:bg-background/50 p-3 rounded-lg border">
+                        <div className="grid grid-cols-2 gap-3 text-sm">
+                          <div>
+                            <span className="text-muted-foreground">Key:</span>{" "}
+                            <span className="font-mono font-semibold">{experiment.growthbook.key}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Status:</span>{" "}
+                            {experiment.growthbook.enabled ? (
+                              <Badge className="bg-green-500/15 text-green-700 ml-1">Enabled</Badge>
+                            ) : (
+                              <Badge variant="secondary" className="ml-1">Disabled</Badge>
+                            )}
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Type:</span>{" "}
+                            <span className="font-medium">{experiment.growthbook.valueType}</span>
+                          </div>
+                          <div>
+                            <span className="text-muted-foreground">Default:</span>{" "}
+                            <span className="font-mono">{JSON.stringify(experiment.growthbook.defaultValue)}</span>
+                          </div>
+                        </div>
+                      </div>
+
+                      {experiment.growthbook.experiments.length > 0 && (
+                        <div className="bg-white dark:bg-background/50 p-3 rounded-lg border">
+                          <strong className="text-xs text-muted-foreground block mb-2">A/B Test Variations:</strong>
+                          <div className="space-y-2">
+                            {experiment.growthbook.experiments[0].variations.map((variation: any, idx: number) => (
+                              <div key={idx} className="flex items-center justify-between text-sm">
+                                <span className="font-medium">{variation.name || variation.key || `Variation ${idx}`}</span>
+                                <div className="flex items-center gap-2">
+                                  <span className="text-muted-foreground text-xs">
+                                    {(variation.weight * 100).toFixed(0)}%
+                                  </span>
+                                  <code className="bg-muted px-2 py-0.5 rounded text-xs">
+                                    {JSON.stringify(variation.value)}
+                                  </code>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {experiment.growthbook.tags.length > 0 && (
+                        <div>
+                          <strong className="text-xs text-muted-foreground block mb-2">Tags:</strong>
+                          <div className="flex flex-wrap gap-1">
+                            {experiment.growthbook.tags.map((tag) => (
+                              <Badge key={tag} variant="outline" className="text-xs">
+                                {tag}
+                              </Badge>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
                   </div>
                 )}
@@ -320,6 +422,107 @@ export function ExperimentTable({ experiments }: ExperimentTableProps) {
                     <ReactMarkdown>
                       {selectedExperiment.context}
                     </ReactMarkdown>
+                  </div>
+                </div>
+              )}
+
+              {selectedExperiment.growthbook && !selectedExperiment.growthbook.error && (
+                <div className="border-2 border-blue-500/20 rounded-lg p-4 bg-blue-50 dark:bg-blue-950/30">
+                  <strong className="text-sm block mb-3 flex items-center gap-2">
+                    <span>🚩</span> GrowthBook Feature Flag
+                  </strong>
+
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4 text-sm">
+                      <div>
+                        <span className="text-muted-foreground">Feature Key:</span>
+                        <p className="font-mono font-semibold">{selectedExperiment.growthbook.key}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Status:</span>
+                        <p>
+                          {selectedExperiment.growthbook.enabled ? (
+                            <Badge className="bg-green-500/15 text-green-700">Enabled</Badge>
+                          ) : (
+                            <Badge variant="secondary">Disabled</Badge>
+                          )}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Value Type:</span>
+                        <p className="font-medium">{selectedExperiment.growthbook.valueType}</p>
+                      </div>
+                      <div>
+                        <span className="text-muted-foreground">Default Value:</span>
+                        <p className="font-mono text-xs">{JSON.stringify(selectedExperiment.growthbook.defaultValue)}</p>
+                      </div>
+                    </div>
+
+                    {selectedExperiment.growthbook.description && (
+                      <div>
+                        <span className="text-sm text-muted-foreground">Description:</span>
+                        <p className="text-sm mt-1">{selectedExperiment.growthbook.description}</p>
+                      </div>
+                    )}
+
+                    {selectedExperiment.growthbook.experiments.length > 0 && (
+                      <div>
+                        <strong className="text-sm block mb-2">A/B Test Configuration:</strong>
+                        <div className="bg-white dark:bg-background/50 p-3 rounded border space-y-2">
+                          {selectedExperiment.growthbook.experiments[0].variations.map((variation: any, idx: number) => (
+                            <div key={idx} className="flex items-center justify-between">
+                              <span className="font-medium text-sm">{variation.name || variation.key || `Variation ${idx}`}</span>
+                              <div className="flex items-center gap-3">
+                                <span className="text-sm text-muted-foreground">
+                                  {(variation.weight * 100).toFixed(0)}% traffic
+                                </span>
+                                <code className="bg-muted px-2 py-1 rounded text-xs">
+                                  {JSON.stringify(variation.value)}
+                                </code>
+                              </div>
+                            </div>
+                          ))}
+                          {selectedExperiment.growthbook.experiments[0].coverage && (
+                            <div className="text-xs text-muted-foreground pt-2 border-t">
+                              Coverage: {(selectedExperiment.growthbook.experiments[0].coverage * 100).toFixed(0)}% of matched users
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedExperiment.growthbook.targetingSummary.length > 0 && (
+                      <div>
+                        <strong className="text-sm block mb-2">Targeting:</strong>
+                        <div className="bg-white dark:bg-background/50 p-3 rounded border">
+                          <ul className="text-sm space-y-1">
+                            {selectedExperiment.growthbook.targetingSummary.map((target, idx) => (
+                              <li key={idx} className="text-muted-foreground">• {target}</li>
+                            ))}
+                          </ul>
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedExperiment.growthbook.tags.length > 0 && (
+                      <div>
+                        <strong className="text-sm block mb-2">Tags:</strong>
+                        <div className="flex flex-wrap gap-1">
+                          {selectedExperiment.growthbook.tags.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-xs">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {selectedExperiment.growthbook.revision && (
+                      <div className="text-xs text-muted-foreground pt-2 border-t">
+                        Version {selectedExperiment.growthbook.revision.version} •
+                        Last updated: {format(new Date(selectedExperiment.growthbook.revision.publishedAt), "MMM d, yyyy")}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}

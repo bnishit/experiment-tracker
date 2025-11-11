@@ -1,6 +1,9 @@
 import { db } from "@/lib/db";
 import { NextRequest, NextResponse } from "next/server";
 import { Prisma } from "@prisma/client";
+import { growthbookAPI } from "@/lib/growthbook-api";
+
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export async function GET(
   request: NextRequest,
@@ -24,7 +27,66 @@ export async function GET(
       );
     }
 
-    return NextResponse.json(experiment);
+    // Enrich with GrowthBook data if linked and API is configured
+    let growthbookData = null;
+
+    if (experiment.growthbookFeatureId && growthbookAPI.isConfigured()) {
+      // Check if cache is fresh (< 5 minutes)
+      const cacheAge = experiment.lastSyncedAt
+        ? Date.now() - experiment.lastSyncedAt.getTime()
+        : Infinity;
+
+      if (cacheAge > CACHE_TTL) {
+        try {
+          const feature = await growthbookAPI.getFeature(
+            experiment.growthbookFeatureId
+          );
+
+          if (feature) {
+            const envStatus = growthbookAPI.getEnvironmentStatus(feature);
+            const experiments = growthbookAPI.extractExperiments(feature);
+            const targetingSummary = growthbookAPI.getTargetingSummary(feature);
+
+            growthbookData = {
+              featureId: feature.id,
+              key: feature.key,
+              valueType: feature.valueType,
+              defaultValue: feature.defaultValue,
+              description: feature.description,
+              enabled: envStatus.enabled,
+              tags: feature.tags,
+              rules: feature.environments.production?.rules || [],
+              experiments,
+              targetingSummary,
+              hasExperiments: envStatus.hasExperiments,
+              hasRollouts: envStatus.hasRollouts,
+              hasOverrides: envStatus.hasOverrides,
+              ruleCount: envStatus.ruleCount,
+              revision: feature.revision,
+            };
+
+            // Update cache timestamp
+            await db.experiment.update({
+              where: { id },
+              data: { lastSyncedAt: new Date() },
+            });
+          }
+        } catch (error) {
+          console.error("GrowthBook API error:", error);
+          // Continue without GrowthBook data - graceful degradation
+          growthbookData = {
+            error: "Failed to fetch from GrowthBook",
+            message:
+              error instanceof Error ? error.message : "Unknown error",
+          };
+        }
+      }
+    }
+
+    return NextResponse.json({
+      ...experiment,
+      growthbook: growthbookData,
+    });
   } catch (error) {
     console.error("Error fetching experiment:", error);
     return NextResponse.json(
@@ -50,6 +112,10 @@ export async function PATCH(
       platforms,
       context,
       isActive,
+      owner,
+      tags,
+      growthbookFeatureId,
+      growthbookProjectId,
     } = body;
 
     const updateData: Prisma.ExperimentUpdateInput = {};
@@ -62,6 +128,12 @@ export async function PATCH(
     if (platforms !== undefined) updateData.platforms = platforms;
     if (context !== undefined) updateData.context = context;
     if (isActive !== undefined) updateData.isActive = isActive;
+    if (owner !== undefined) updateData.owner = owner;
+    if (tags !== undefined) updateData.tags = tags;
+    if (growthbookFeatureId !== undefined)
+      updateData.growthbookFeatureId = growthbookFeatureId;
+    if (growthbookProjectId !== undefined)
+      updateData.growthbookProjectId = growthbookProjectId;
 
     const experiment = await db.experiment.update({
       where: { id },
